@@ -7,7 +7,14 @@ from pydantic import BaseModel, Field
 
 import base64
 
-from cryptography import sign, verify, make_qr, QR_FILE
+from cryptography import (
+    sign, verify, make_qr, split_shares,
+    QR_FILE, SHARE_A, SHARE_B, RECON_FILE,
+)
+
+
+def _b64(path):
+    return base64.b64encode(path.read_bytes()).decode()
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -36,8 +43,8 @@ def send(
     tx = Transaction(sender=sender, receiver=receiver, amount=amount)
     message = tx.model_dump_json().encode()
     signature = sign(message)
-    make_qr(tx, signature)
-    qr_b64 = base64.b64encode(QR_FILE.read_bytes()).decode()
+    qr_matrix = make_qr(tx, signature)
+    split_shares(qr_matrix)
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -46,6 +53,9 @@ def send(
             "tx": tx,
             "signature": signature.hex(),
             "verified": verify(message, signature),
-            "qr_b64": qr_b64,
+            "qr_b64": _b64(QR_FILE),
+            "share_a": _b64(SHARE_A),
+            "share_b": _b64(SHARE_B),
+            "recon": _b64(RECON_FILE),
         },
     )

@@ -18,8 +18,12 @@ from Crypto.PublicKey import ECC
 from Crypto.Signature import DSS
 from Crypto.Hash import SHA256
 
-KEY_FILE = Path(__file__).parent / "signing_key.pem"
-QR_FILE = Path(__file__).parent / "transaction_qr.png"
+_HERE = Path(__file__).parent
+KEY_FILE = _HERE / "signing_key.pem"
+QR_FILE = _HERE / "transaction_qr.png"
+SHARE_A = _HERE / "shareA.png"
+SHARE_B = _HERE / "shareB.png"
+RECON_FILE = _HERE / "reconstructed_qr.png"
 
 
 def _load_key():
@@ -75,12 +79,16 @@ def make_qr(tx, signature: bytes, path: Path = QR_FILE) -> np.ndarray:
     return np.array(qr.get_matrix(), dtype=bool)  # True = black module
 
 
-def split_shares(qr_matrix: np.ndarray, share1_path: str, share2_path: str) -> None:
-    """Step 4 — 2-of-2 visual cryptography: split QR into two shares."""
+def split_shares(qr_matrix: np.ndarray) -> None:
+    """Step 4 — 2-of-2 visual cryptography.
+
+    Splits the QR into shareA/shareB (each reveals nothing alone) and saves
+    their overlay to reconstructed_qr.png as proof they recombine.
+    """
     from PIL import Image
 
     height, width = qr_matrix.shape
-    share1 = np.zeros((height * 2, width * 2), dtype=bool)
+    share1 = np.zeros((height * 2, width * 2), dtype=bool)  # True = black subpixel
     share2 = np.zeros((height * 2, width * 2), dtype=bool)
 
     block_a = np.array([[True, False], [False, True]])
@@ -93,8 +101,10 @@ def split_shares(qr_matrix: np.ndarray, share1_path: str, share2_path: str) -> N
             share1[r * 2:(r + 1) * 2, c * 2:(c + 1) * 2] = sub
             share2[r * 2:(r + 1) * 2, c * 2:(c + 1) * 2] = ~sub if is_black else sub
 
-    Image.fromarray(~share1).save(share1_path)
-    Image.fromarray(~share2).save(share2_path)
+    overlay = np.bitwise_or(share1, share2)  # stacking the shares
+    Image.fromarray(~share1).save(SHARE_A)   # ~ : True(black) -> 0(black pixel)
+    Image.fromarray(~share2).save(SHARE_B)
+    Image.fromarray(~overlay).save(RECON_FILE)
 
 
 if __name__ == "__main__":
@@ -115,6 +125,7 @@ if __name__ == "__main__":
     assert QR_FILE.exists() and matrix.dtype == bool, "QR PNG + matrix expected"
     print(f"Step 3 OK - wrote {QR_FILE.name} ({matrix.shape[0]}x{matrix.shape[1]} modules)")
 
-    # --- Step 4 demo ---
-    split_shares(matrix, "share1.png", "share2.png")
-    print("Step 4 demo - wrote share1.png, share2.png")
+    # --- Step 4 self-check: shares reveal nothing alone, overlay restores QR ---
+    split_shares(matrix)
+    assert SHARE_A.exists() and SHARE_B.exists() and RECON_FILE.exists()
+    print(f"Step 4 OK - wrote {SHARE_A.name}, {SHARE_B.name}, {RECON_FILE.name}")
