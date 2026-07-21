@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 26rem; margin: 4rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: 1.5rem; }
+    label { display: block; margin: 0.75rem 0 0.25rem; font-size: 0.9rem; color: #333; }
+    input { width: 100%; padding: 0.5rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    button { margin-top: 1.25rem; width: 100%; padding: 0.6rem; border: 0; border-radius: 4px; background: #2563eb; color: #fff; font-size: 1rem; cursor: pointer; }
+    .result { margin-top: 1.25rem; padding: 0.75rem; background: #ecfdf5; border: 1px solid #10b981; border-radius: 4px; color: #065f46; }
+  </style>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+
+  {% if result %}
+  <p class="result">{{ result }}</p>
+  {% endif %}
+
+  <form method="post" action="/send">
+    <label for="sender">Sender</label>
+    <input id="sender" name="sender" required>
+
+    <label for="receiver">Receiver</label>
+    <input id="receiver" name="receiver" required>
+
+    <label for="amount">Amount</label>
+    <input id="amount" name="amount" type="number" step="0.01" min="0.01" required>
+
+    <button type="submit">Send</button>
+  </form>
+</body>
+</html>
