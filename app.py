@@ -5,7 +5,9 @@ from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from cryptography import sign, verify
+import base64
+
+from cryptography import sign, verify, make_qr, QR_FILE
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -34,6 +36,8 @@ def send(
     tx = Transaction(sender=sender, receiver=receiver, amount=amount)
     message = tx.model_dump_json().encode()
     signature = sign(message)
+    make_qr(tx, signature)
+    qr_b64 = base64.b64encode(QR_FILE.read_bytes()).decode()
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -42,5 +46,6 @@ def send(
             "tx": tx,
             "signature": signature.hex(),
             "verified": verify(message, signature),
+            "qr_b64": qr_b64,
         },
     )

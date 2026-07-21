@@ -1,19 +1,25 @@
-"""Step 2 — Digital Signature (ECC / P-256).
+"""Steps 2-3 — Digital Signature (ECC / P-256) + QR encoding.
 
-sign(message)  -> signature bytes, bound to the message
+sign(message)              -> signature bytes, bound to the message
 verify(message, signature) -> True if untampered
+make_qr(tx, signature)     -> saves transaction_qr.png, returns the QR module
+                              matrix (bool, True = black) for Step 4
 
 The keypair is generated once and saved to signing_key.pem so signatures
 stay verifiable across runs. Run this file directly for a self-check plus a
-Step 3/4 (QR + visual-crypto) demo.
+Step 4 (visual-crypto) demo.
 """
+import json
 from pathlib import Path
 
+import numpy as np
+import qrcode
 from Crypto.PublicKey import ECC
 from Crypto.Signature import DSS
 from Crypto.Hash import SHA256
 
 KEY_FILE = Path(__file__).parent / "signing_key.pem"
+QR_FILE = Path(__file__).parent / "transaction_qr.png"
 
 
 def _load_key():
@@ -43,53 +49,72 @@ def verify(message: bytes, signature: bytes) -> bool:
         return False
 
 
+def make_qr(tx, signature: bytes, path: Path = QR_FILE) -> np.ndarray:
+    """Step 3 — encode txid+amount+hash+signature into a QR.
+
+    Saves a scannable PNG at `path` and returns the QR module matrix
+    (bool array, True = black module) for the visual-crypto step.
+    """
+    message = tx.model_dump_json().encode()
+    payload = json.dumps(
+        {
+            "txid": tx.txid,
+            "amount": tx.amount,
+            "hash": SHA256.new(message).hexdigest(),
+            "signature": signature.hex(),
+        }
+    )
+    qr = qrcode.QRCode(
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(payload)
+    qr.make(fit=True)
+    qr.make_image(fill_color="black", back_color="white").save(path)
+    return np.array(qr.get_matrix(), dtype=bool)  # True = black module
+
+
+def split_shares(qr_matrix: np.ndarray, share1_path: str, share2_path: str) -> None:
+    """Step 4 — 2-of-2 visual cryptography: split QR into two shares."""
+    from PIL import Image
+
+    height, width = qr_matrix.shape
+    share1 = np.zeros((height * 2, width * 2), dtype=bool)
+    share2 = np.zeros((height * 2, width * 2), dtype=bool)
+
+    block_a = np.array([[True, False], [False, True]])
+    block_b = np.array([[False, True], [True, False]])
+
+    for r in range(height):
+        for c in range(width):
+            is_black = qr_matrix[r, c]
+            sub = block_a if np.random.rand() > 0.5 else block_b
+            share1[r * 2:(r + 1) * 2, c * 2:(c + 1) * 2] = sub
+            share2[r * 2:(r + 1) * 2, c * 2:(c + 1) * 2] = ~sub if is_black else sub
+
+    Image.fromarray(~share1).save(share1_path)
+    Image.fromarray(~share2).save(share2_path)
+
+
 if __name__ == "__main__":
-    # --- self-check: a valid signature verifies, a tampered message does not ---
+    # --- Step 2 self-check: valid signature verifies, tampered one does not ---
     msg = b'{"sender":"Alice","receiver":"Bob","amount":10000}'
     sig = sign(msg)
     assert verify(msg, sig), "valid signature must verify"
     assert not verify(msg + b"x", sig), "tampered message must fail"
-    print("Step 2 OK — signature verifies, tamper rejected")
+    print("Step 2 OK - signature verifies, tamper rejected")
 
-    # --- Step 3/4 demo: QR of the signature, split into visual-crypto shares ---
-    import numpy as np
-    from PIL import Image
-    import qrcode
+    # --- Step 3 self-check: QR PNG is written ---
+    class _Tx:
+        txid, amount = "TXDEMO1", 10000.0
+        def model_dump_json(self):
+            return '{"sender":"Alice","receiver":"Bob","amount":10000}'
 
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=1,
-        border=0,
-    )
-    qr.add_data(sig)
-    qr.make(fit=True)
+    matrix = make_qr(_Tx(), sig)
+    assert QR_FILE.exists() and matrix.dtype == bool, "QR PNG + matrix expected"
+    print(f"Step 3 OK - wrote {QR_FILE.name} ({matrix.shape[0]}x{matrix.shape[1]} modules)")
 
-    qr_img = qr.make_image(fill_color="black", back_color="white").convert("1")
-    qr_array = np.array(qr_img)
-    height, width = qr_array.shape
-
-    share1 = np.zeros((height * 2, width * 2), dtype=bool)
-    share2 = np.zeros((height * 2, width * 2), dtype=bool)
-
-    block_white_0 = np.array([[True, False], [False, True]])
-    block_white_1 = np.array([[False, True], [True, False]])
-
-    for r in range(height):
-        for c in range(width):
-            is_black = not qr_array[r, c]
-            rand_choice = np.random.rand() > 0.5
-            if is_black:
-                s1_sub = block_white_0 if rand_choice else block_white_1
-                s2_sub = ~s1_sub
-            else:
-                s1_sub = block_white_0 if rand_choice else block_white_1
-                s2_sub = s1_sub.copy()
-            share1[r * 2:(r + 1) * 2, c * 2:(c + 1) * 2] = s1_sub
-            share2[r * 2:(r + 1) * 2, c * 2:(c + 1) * 2] = s2_sub
-
-    Image.fromarray(~share1).save("share1.png")
-    Image.fromarray(~share2).save("share2.png")
-    overlay = np.bitwise_or(share1, share2)
-    Image.fromarray(~overlay).save("reconstructed_qr.png")
-    print("Step 3/4 demo — wrote share1.png, share2.png, reconstructed_qr.png")
+    # --- Step 4 demo ---
+    split_shares(matrix, "share1.png", "share2.png")
+    print("Step 4 demo - wrote share1.png, share2.png")
