@@ -4,3 +4,4 @@ __pycache__/
 .env
 signing_key.pem
 *.png
+*.csv
