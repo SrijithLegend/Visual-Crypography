@@ -5,6 +5,8 @@ from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+from cryptography import sign, verify
+
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
@@ -30,6 +32,15 @@ def send(
     amount: float = Form(gt=0),
 ):
     tx = Transaction(sender=sender, receiver=receiver, amount=amount)
+    message = tx.model_dump_json().encode()
+    signature = sign(message)
     return templates.TemplateResponse(
-        request, "index.html", {"title": "Send Money", "tx": tx}
+        request,
+        "index.html",
+        {
+            "title": "Send Money",
+            "tx": tx,
+            "signature": signature.hex(),
+            "verified": verify(message, signature),
+        },
     )
