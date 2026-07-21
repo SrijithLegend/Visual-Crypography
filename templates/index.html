@@ -11,13 +11,25 @@
     input { width: 100%; padding: 0.5rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
     button { margin-top: 1.25rem; width: 100%; padding: 0.6rem; border: 0; border-radius: 4px; background: #2563eb; color: #fff; font-size: 1rem; cursor: pointer; }
     .result { margin-top: 1.25rem; padding: 0.75rem; background: #ecfdf5; border: 1px solid #10b981; border-radius: 4px; color: #065f46; }
+    .result dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin: 0.5rem 0 0; }
+    .result dt { font-weight: 600; }
+    .result dd { margin: 0; font-family: ui-monospace, monospace; }
   </style>
 </head>
 <body>
   <h1>{{ title }}</h1>
 
-  {% if result %}
-  <p class="result">{{ result }}</p>
+  {% if tx %}
+  <div class="result">
+    <strong>Transaction created</strong>
+    <dl>
+      <dt>Transaction ID</dt><dd>{{ tx.txid }}</dd>
+      <dt>Sender</dt><dd>{{ tx.sender }}</dd>
+      <dt>Receiver</dt><dd>{{ tx.receiver }}</dd>
+      <dt>Amount</dt><dd>₹{{ "%.2f"|format(tx.amount) }}</dd>
+      <dt>Timestamp</dt><dd>{{ tx.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</dd>
+    </dl>
+  </div>
   {% endif %}
 
   <form method="post" action="/send">
