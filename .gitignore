@@ -5,3 +5,5 @@ __pycache__/
 signing_key.pem
 *.png
 *.csv
+*.log
+*.gitignore
