@@ -1,65 +1,141 @@
-🔐 AI-Driven Steganographic Visual Cryptography for Secure Transactions
-An end-to-end cryptographic and generative AI system designed to secure financial transactions. This system combines Elliptic Curve Digital Signatures (ECDSA), 2-of-2 Visual Cryptography (VSS), and Conditional Generative Adversarial Networks (cGANs) to encode, split, and hide signed QR code payloads inside realistic synthetic images.
+# 🔐 AI-Enhanced Visual Cryptography for Human-Verifiable Blockchain Banking
 
-📌 Overview
-Traditional transaction security relies heavily on digital-only verification. This project introduces a hybrid physical-digital security pipeline:
+An end-to-end cryptographic + generative-AI system that secures financial
+transactions and lets a human **visually verify** them. It combines Elliptic
+Curve Digital Signatures (ECDSA), 2-of-2 Visual Cryptography (VC), and a
+Conditional GAN that turns a signed transaction QR into **two natural-looking
+landscape "shares"** — innocent on their own, but revealing the QR when stacked.
 
-Digital Signature & QR Encoding: A transaction payload is signed using ECDSA (P-256) and encoded into a QR code.
+---
 
-Visual Cryptography (2-of-2 VSS): The QR matrix is decomposed into two noise-like transparency shares (shareA and shareB). Neither share reveals information individually, but physically or digitally stacking them reveals the original QR code via bitwise pixel expansion.
+## 📌 Overview
 
-Generative Steganography (cGAN): A Conditional GAN conditioned on both shares simultaneously (128x128x2) embeds the visual cryptography data into a synthetic 3-channel RGB image.
+Blockchain banking is transparent but leaks privacy and offers little that a
+non-technical user can independently verify. This project adds a human-verifiable
+layer: security you can check with your own eyes by overlaying two pictures.
 
-🏗 System Architecture
-[ Transaction Data ] 
+1. **Digital signature & QR encoding** — the transaction is signed with ECDSA
+   (P-256) and its hash + signature are encoded into a QR code.
+2. **AI-generated visual shares** — a Conditional GAN, conditioned on the QR and
+   two real landscape cover images, outputs **Share A** and **Share B**. Each
+   looks like an ordinary landscape and reveals nothing about the transaction.
+3. **Human-verifiable recovery** — physically stacking the two shares
+   (`overlay = A × B`, transparency multiply) reveals the QR in the combined
+   image's brightness. No decoder network is needed — just the overlay.
+
+> The generative direction is **QR → shares** (the secret is hidden *into* the
+> shares), and recovery is a real physical stacking operation — true visual
+> cryptography, not a neural decode.
+
+---
+
+## 🏗 System Architecture
+
+```
+[ Transaction Data ]
          │
          ▼
-  [ ECDSA Sign ] ──► [ SHA-256 Digest ]
+  [ ECDSA Sign (P-256) ] ──► [ SHA-256 Digest ]
          │
          ▼
-  [ QR Code Generator ]
-         │
-         ▼
-  [ 2-of-2 Visual Cryptography Split ]
-      ┌──┴──────────┐
-      ▼             ▼
-  [ Share A ]   [ Share B ]
-      └──┬──────────┘
-         ▼ (Stacked 2-Channel Input)
-  [ cGAN Generator (U-Net) ]
-         │
-         ▼
-  [ Synthetic Stego Image ]
-🛠 Features
-Authenticity & Non-Repudiation: Powered by PyCryptodome using the P-256 ECC curve and FIPS-186-3 DSS.
+  [ QR Code (secret) ]        [ Real Landscape Covers  C_a , C_b ]
+         └──────────────┬─────────────────┘
+                        ▼
+              [ cGAN Generator (U-Net) ]
+                 ┌──────┴───────┐
+                 ▼              ▼
+            [ Share A ]     [ Share B ]     ← look like landscapes
+                 └──────┬───────┘
+                        ▼  physical stack (A × B)
+                  [ Overlay ] ──► QR revealed ──► verify signature
+```
 
-Information-Theoretic Security: The 2-of-2 visual secret sharing scheme ensures individual shares contain zero mutual information regarding the underlying QR payload.
+---
 
-Deep Learning Integration: Built with TensorFlow/Keras, featuring a U-Net Generator with skip connections and a PatchGAN-style Discriminator.
+## 🛠 Features
 
-📦 Prerequisites & Installation
-Ensure you have Python 3.9+ installed. Install the required dependencies:
+- **Authenticity & non-repudiation** — PyCryptodome, P-256 ECC, FIPS-186-3 DSS.
+- **Human-verifiable security** — the transaction is confirmed by stacking two
+  images, not by trusting a black box.
+- **Privacy / information hiding** — each share alone is a plain landscape and
+  reveals nothing about the payload.
+- **Robust to AI reconstruction attacks** — an adversarial *secrecy* network is
+  trained to recover the QR from a single share; the generator is optimized to
+  defeat it.
+- **Deep-learning core** — TensorFlow/Keras: U-Net generator (skip connections),
+  PatchGAN discriminator, plus reconstruction, content, adversarial, and secrecy
+  losses.
 
-Bash
-pip install tensorflow numpy pillow qrcode pycryptodome matplotlib
-💻 Usage
-Run the main pipeline script to generate signatures, construct shares, train the cGAN, and render the final synthetic output:
+---
 
-Bash
-python main.py
-Script Execution Flow
-Key Generation: Automatically creates or loads signing_key.pem.
+## 📦 Prerequisites & Installation
 
-Transaction Creation: Signs demo payload {"sender": "Alice", "receiver": "Bob", "amount": 10000.0}.
+Python 3.9+:
 
-QR Generation & Splitting: Generates transaction_qr.png, splits it into shareA.png and shareB.png, and saves an overlay test reconstructed_qr.png.
+```bash
+pip install tensorflow numpy pillow qrcode pycryptodome matplotlib opencv-python
+```
 
-Model Training & Generation: Trains the cGAN on the stacked dual-channel share input and displays the synthesized stego image alongside the input shares.
+---
 
-📑 Technical References
-Visual Cryptography: Naor, M., & Shamir, A. (1994). Visual Cryptography. Advances in Cryptology – EUROCRYPT '94.
+## 💻 Usage
 
-Conditional GANs: Isola, P., Zhu, J. Y., Zhou, T., & Efros, A. A. (2017). Image-to-Image Translation with Conditional Adversarial Networks (Pix2Pix).
+### 1. Verify the pipeline locally (no GPU, seconds)
 
-📜 License
-Distributed under the MIT License. See LICENSE for more information.
+```bash
+python cryptography.py   # sign → QR → classic VC shares (Steps 2–4 self-check)
+python vcgan.py          # GAN smoke test: one train step, asserts shapes/losses
+```
+
+### 2. Train the GAN (needs a GPU — use Google Colab)
+
+Local Windows has no usable GPU for TensorFlow, so training runs on a free Colab
+T4. Follow **`COLAB.md`**: download the Kaggle `landscape-pictures` dataset,
+train, and download `generator.weights.h5`.
+
+### 3. Generate + verify shares for a real transaction
+
+```bash
+python infer.py cover1.jpg cover2.jpg
+```
+
+Outputs `shareA.png`, `shareB.png`, `overlay.png`, `recovered_qr.png`, then
+decodes the overlay and confirms the ECDSA signature — the human-verifiable proof.
+
+---
+
+## 📂 Project Files
+
+| File | Role |
+|------|------|
+| `cryptography.py` | ECDSA signing, QR encoding, classic 2-of-2 VC baseline |
+| `vcgan.py` | The AI model: U-Net generator, discriminator, secrecy attacker, losses, training |
+| `infer.py` | Generate + verify shares for a real signed transaction |
+| `COLAB.md` | Step-by-step GPU training on Google Colab |
+| `docs/superpowers/specs/` | Design spec |
+
+---
+
+## ⚙️ Tuning
+
+The one knob that matters lives at the top of `vcgan.py`:
+
+- Raise `LAMBDA_RECON` if the recovered QR won't scan.
+- Raise `LAMBDA_CONTENT` if the shares look too dark/muted.
+
+This beauty-vs-recovery tension is inherent to true visual cryptography.
+
+---
+
+## 📑 References
+
+- **Visual Cryptography** — Naor, M. & Shamir, A. (1994). *Visual Cryptography.*
+  Advances in Cryptology – EUROCRYPT '94.
+- **Conditional GANs (pix2pix)** — Isola, P., Zhu, J.-Y., Zhou, T. & Efros, A. A.
+  (2017). *Image-to-Image Translation with Conditional Adversarial Networks.*
+
+---
+
+## 📜 License
+
+Distributed under the MIT License. See `LICENSE` for details.

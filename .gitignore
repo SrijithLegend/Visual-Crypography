@@ -6,4 +6,5 @@ signing_key.pem
 *.png
 *.csv
 *.log
+*.h5
 *.gitignore
